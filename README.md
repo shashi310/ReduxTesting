@@ -1,9 +1,10 @@
-![logo](https://github.com/shashi310/ReduxTesting/blob/main/git_banner.png)
+<img align="center" alt="Gif" height="400" src="https://shashi310.github.io/buyFromUsApi/git_banner.png">
+
 <h1 align="center">Hi 👋, I'm Shashikant Yadav</h1>
 
 <h3 align="center">A Full Stack MERN Developer driving innovation and user-centric solutions</h3>
-
-<img align="right" alt="Gif" width="400" src="https://camo.githubusercontent.com/8bf6f6d78abc81fcf9c49f10649423e73ea44bc248e83aaae8759d401c829a84/68747470733a2f2f70687973696373677572756b756c2e66696c65732e776f726470726573732e636f6d2f323031392f30322f6368617261637465722d312e676966">
+<!-- 
+<img align="right" alt="Gif" width="400" src="https://camo.githubusercontent.com/8bf6f6d78abc81fcf9c49f10649423e73ea44bc248e83aaae8759d401c829a84/68747470733a2f2f70687973696373677572756b756c2e66696c65732e776f726470726573732e636f6d2f323031392f30322f6368617261637465722d312e676966"> -->
 
 <p align="left"> <a href="https://github.com/ryo-ma/github-profile-trophy"><img src="https://github-profile-trophy.vercel.app/?username=shashi310" alt="shashi310" /></a> </p>
 
