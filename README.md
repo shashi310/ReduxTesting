@@ -11,7 +11,7 @@
 
 - 🌱 I’m currently learning **MERN**
 
-- 👨‍💻 All of my projects are available at [https://shashi310.github.io/](Portfolio)
+- 👨‍💻 All of my projects are available at <a href="https://shashi310.github.io/" target="_blank">Portfolio</a>
 
 - 💬 Ask me about **React, Node ,Mongo**
 
