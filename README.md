@@ -17,7 +17,7 @@
 
 - 📫 How to reach me **shashi31396s@gmail.com**
 
-- 📄 Know about my experiences [https://drive.google.com/drive/folders/1v81OGr_T3FBPvJAMFQdB_fZbM7Jt8WCJ](Resume)
+- 📄 Know about my experiences <a href="https://shashi310.github.io/buyFromUsApi/Shashikant_Yadav.pdf" target="_blank">Resume</a>
 
 <h3 align="left">Connect with me:</h3>
 <p align="left">
