@@ -1,0 +1,1403 @@
+product_Schema.ts
+
+import { momentTz } from "../utils";
+import { ObjectId } from "mongodb";
+
+export interface Amount {
+  amount: number;
+}
+
+export interface Cash extends Amount {}
+
+export interface Online extends Amount {}
+
+export interface Payment {
+  cash: Cash;
+  online: Online;
+}
+
+export interface Purchase {
+  from: string;
+  phone: string;
+  purchase_amount: number;
+  paid_amount: number;
+  balance: number;
+  comment: string;
+  payment: Payment;
+}
+
+export interface GST {
+  sgst: number;
+  cgst: number;
+  igst: number;
+  gst_amount: number;
+  gst_number: string;
+  gst_comment: string;
+}
+
+export interface Sold {
+  product_id: ObjectId;
+  sold_at: Date;
+  sell_price: number;
+  sell_comment: string;
+  sell_warranty: string;
+  payment: Payment;
+  to: string;
+  phone: string;
+  client_address: string;
+  email: string;
+  gst: GST;
+  balance: number;
+  profit_loss: number;
+}
+
+export interface Product {
+  dukandar_id: ObjectId;
+  product: string;
+  model: string;
+  color: string;
+  imei: string;
+  imei_1: string;
+  phone_id: string;
+  battery: number;
+  ram: string;
+  hdd: string;
+  purchase: Purchase;
+  sold?: Sold;
+  entry_type: string;
+  purchase_date: Date;
+  is_sold: boolean;
+  created_at: any;
+  updated_at: any;
+  id_proof: any;
+  
+  bill_proof: any;
+  mobile_type: any;
+  id_imgs: any;
+  id_proof_1: any;
+  id_proof_2: any;
+  id_proof_3: any;
+  bill_proof_1: any;
+  receipt_no: string;
+  receipt_date: Date;
+}
+
+export const formatProduct = (body: Product) => {
+  return {
+    dukandar_id: body.dukandar_id,
+    product: body.product,
+    model: body.model,
+    color: body.color,
+    imei: body.imei,
+    imei_1: body.imei_1,
+    phone_id: body.phone_id,
+    battery: body.battery,
+    ram: body.ram,
+    hdd: body.hdd,
+    purchase: body.purchase,
+    sold: body.sold,
+    entry_type: body.entry_type,
+    purchase_at: momentTz(body.purchase_date).format("YYYY-MM-DD"),
+    is_sold: body.is_sold,
+    
+    id_proof: body.id_proof,
+    id_proof_1: body.id_proof_1,
+    id_proof_2: body.id_proof_2,
+    id_proof_3: body.id_proof_3,
+    id_imgs:[body?.id_proof,body?.id_proof_1,body?.id_proof_2,body?.id_proof_3],
+    bill_proof: body.bill_proof,
+    bill_proof_1: body.bill_proof_1,
+    mobile_type: body.mobile_type,
+    created_at: momentTz().format(),
+    updated_at: momentTz().format(),
+    receipt_no: body.receipt_no,
+    receipt_date: body.receipt_date,
+  };
+};
+
+export const formatSold = (body: any) => {
+  return {
+    product_id: body.product_id,
+    sold_at: momentTz(body.sold_at).format("YYYY-MM-DD"),
+    sell_price: parseInt(body.sell_price),
+    sell_comment: body.sell_comment || "",
+    sell_warranty: body.sell_warranty || "",
+    payment: body.payment,
+    to: body.to,
+    phone: body.phone,
+    client_address: body.client_address,
+    email: body.email,
+    gst: body.gst,
+    is_gst: body.is_gst,
+    balance: body.balance || 0,
+    profit_loss: body.profit_loss || 0,
+    actual_sell_price: parseInt(body.actual_sell_price),
+    is_settled: false,
+    created_at: momentTz().format(),
+    updated_at: momentTz().format(),
+  };
+};
+
+export const formatProductPurchase = (body: any) => {
+  const { phone }: { phone: string } = body;
+  return {
+    product: body.product,
+    model: body.model,
+    id_proof: body.id_proof === "null" ? null : body.id_proof,
+    id_imgs:[body?.id_proof,body?.id_proof_1,body?.id_proof_2,body?.id_proof_3],
+    bill_proof: body.bill_proof === "null" ? null : body.bill_proof,
+    color: body.color,
+    imei: body.imei,
+    imei_1: body.imei_1 ? body.imei_1 : null,
+    phone_id: body.phone_id,
+    battery: body.battery,
+    ram: parseInt(body.ram),
+    hdd: parseInt(body.hdd),
+    purchase: { ...body.purchase, phone: parseInt(phone) },
+    updated_at: momentTz().format(),
+  };
+
+
+
+
+
+
+____________Product.controller.ts___________________
+
+import { Context } from "koa";
+import {
+  jsonFormatter,
+  jsonSchemaUtil,
+  momentTz,
+  MSG,
+  RFC,
+  Roles,
+} from "../utils";
+import { Document , ObjectId } from "mongodb";
+import { validateData } from "../helpers/validator.helper.";
+import { ValidationType } from "../interfaces";
+import { formatProduct, formatSold } from "../schema-formatter";
+import Excel from "exceljs";
+import path from "path";
+const gstIndiaUtils = require("@scrrum-labs/gst-india-utils");
+import {
+  advancedSearchService,
+  byProductCountService,
+  checkk,
+  createProduct,
+  deleteProductById,
+  deleteProductSellById,
+  editPurchaseProductById,
+  getDashboardStatusService,
+  getFilteredProductService,
+  getInvidualKhata,
+  getInvidualKhataAll,
+  getKhataReportService,
+  getKhataStatusService,
+  getLastAddedProd,
+  getProductById,
+  getProductByIEMIService,
+  getProductByImeiService,
+  getProductByInvoiceId,
+  getProductListByUser,
+  getProductsReportService,
+  getProductsStatusService,
+  getReceiptLastAddedProd,
+  modelByProductCountService,
+  searchProductService,
+  searchUserByProductPurchasedService,
+  searchUserByProductSoldService,
+  updateProductPayment,
+  updateProductSettleStatus,
+} from "../services/product.service";
+import { formatProductPurchase } from "../schema-formatter/product.schema";
+import { validFileSize, validImage } from "../helpers/valid-file.helper";
+import { saveFile } from "../helpers/save-file.helper";
+import moment from "moment";
+
+const savingFileForPurchase = async (imageData: any) => {
+  let status;
+  let responseBody;
+  if (imageData) {
+    if (await validImage(imageData?.type)) {
+      // validate file size
+      if (await validFileSize(imageData?.size)) {
+        return await saveFile(imageData?.path, imageData?.name);
+      } else {
+        status = RFC.H422;
+        responseBody = jsonFormatter.errorResponse(
+          RFC.H422,
+          "File size is too large"
+        );
+      }
+    } else {
+      status = RFC.H422;
+      responseBody = jsonFormatter.errorResponse(RFC.H422, MSG.INVALID_IMAGE);
+    }
+    return { status, responseBody };
+  }
+  return { status: 404 };
+};
+const extractDataFromFile = (productData: any) => {
+  const totalItems = productData.map((item: any) => {
+    return {
+      ...item,
+      entry_type: "purchase",
+      mod: {
+        cash: { amount: item.payment_cash },
+        online: { amount: item.payment_online },
+      },
+      is_sold: false,
+      mobile_type: item.mobile_type || "used",
+    };
+  });
+  return totalItems;
+};
+
+const formatBd = (
+  prd: any,
+  ctx: any,
+  others: any,
+  isInventoryUpload: Boolean
+) => {
+  let imeiErrs: any;
+  return prd.map(async (p: any, i: any) => {
+    const parsedProd = typeof p === "string" ? JSON.parse(p) : p;
+    let item = isInventoryUpload
+      ? { ...parsedProd }
+      : { ...parsedProd, ...others };
+    const check = { ...ctx?.request?.files };
+    let imgURL = `${process.env.APP_IMAGE_BASE_URL}/`;
+    if (Object.values(check).length > 0) {
+      Object.entries(check).forEach(async (b) => {
+        let arr=[]
+        if (b[0] === "id_proof") {
+
+          let id = await savingFileForPurchase(b[1]);
+          item["id_proof"] = imgURL + id;
+          
+          console.log("img-1",item["id_proof"]);
+          arr.push(item["id_proof"])
+        }
+        if (b[0] === `id_proof-1`) {
+          let id = await savingFileForPurchase(b[1]);
+          item["id_proof_1"] = imgURL + id;
+          console.log("img-2",item["id_proof_1"]);
+          arr.push(item["id_proof_1"])
+        }
+        //adding the extra feilds-2
+        if (b[0] === `id_proof-2`) {
+          let id = await savingFileForPurchase(b[1]);
+          item["id_proof_2"] = imgURL + id;
+          console.log("img-3",item["id_proof_2"]);
+          arr.push(item["id_proof_2"])
+        }
+           //adding the extra feilds-3
+        if (b[0] === `id_proof-3`) {
+          let id = await savingFileForPurchase(b[1]);
+          item["id_proof_3"] = imgURL + id;
+          console.log("img-4",item["id_proof_3"]);
+          arr.push(item["id_proof_3"])
+        }
+
+        item["id_imgs"]=arr.length>0 ?[...arr] :null
+     
+
+        if (b[0] === `bill_proof-${i}`) {
+          const splitIndex = b[0].split("-")[1];
+          let bill = await savingFileForPurchase(b[1]);
+          if (splitIndex == i) item["bill_proof"] = imgURL + bill;
+        }
+        if (b[0] === `bill_proof-next-${i}`) {
+          const splitIndex = b[0].split("-")[2];
+          let bill = await savingFileForPurchase(b[1]);
+          if (splitIndex == i) item["bill_proof_1"] = imgURL + bill;
+        }
+      });
+    }
+    
+    // validation item
+    const validation: ValidationType = await validateData(
+      item,
+      jsonSchemaUtil.purchaseProduct,
+      {}
+    );
+    if (validation.errors) {
+      return { errors: validation.errors, index: i };
+    }
+    // get product by imei
+    let productByImei: any;
+    // if (!isInventoryUpload) {
+    productByImei = await getProductByIEMIService(
+      ctx,
+      item.imei,
+      ctx.state.user._id
+    );
+    // }
+
+    if (
+      !(
+        item.mobile_type.toLowerCase() == "used" ||
+        item.mobile_type.toLowerCase() == "new"
+      )
+    ) {
+      return { errors: "Mobile type is not correct", index: i };
+    }
+
+    if (
+      !(/^\d{10}$/.test(item.phone) || /^\d{10}$/.test(item["alt_phone_no"]))
+    ) {
+      return { errors: "Phone number is not correct", index: i };
+    }
+    // if (/^\d{6}$/.test(item?.hsn) || /^\d{6}$/.test(item?.sac)) {
+    //   return { errors: "HSN is not correct", index: i };
+    // }
+    if (!/^\d{15}$/.test(item.imei)) {
+      return { errors: "IMEI number is not correct", index: i };
+    }
+    if (
+      item?.purchase_amount?.length > 7 ||
+      item?.payment_cash?.length > 7 ||
+      item?.payment_online?.length > 7
+    ) {
+      if (item?.purchase_amount?.length > 7)
+        return {
+          errors: "Purchase amount cannot be greater than 9999999",
+          index: i,
+        };
+      else if (item?.payment_cash?.length > 7)
+        return {
+          errors: "Cash amount cannot be greater than 9999999",
+          index: i,
+        };
+      else
+        return {
+          errors: "Online amount cannot be greater than 9999999",
+          index: i,
+        };
+    }
+    if (
+      Number(item?.purchase_amount) <
+      Number(item?.payment_cash) + Number(item?.payment_online)
+    ) {
+      return {
+        errors: "Received amount is not matched with purchase amount",
+        index: i,
+      };
+    }
+    if (productByImei) {
+      imeiErrs = { status: true, index: i };
+      return imeiErrs;
+    }
+    const purchaseData: any = formatProduct(item);
+    const purchaseAmount = parseFloat(item.purchase_amount);
+    const cashAmount = parseFloat(item.mod.cash.amount);
+    const onlineAmount = parseFloat(item.mod.online.amount);
+    purchaseData.id_proof = item?.id_proof; 
+    purchaseData.id_proof_1 = item?.id_proof_1
+    purchaseData.id_imgs=[item?.id_proof, item?.id_proof_1,item?.id_proof_2,item?.id_proof_3]
+    purchaseData.bill_proof = item?.bill_proof;
+    purchaseData.phone_id = item?.phone_id;
+    purchaseData.dukandar_id = new ObjectId(ctx.state.user._id);
+    (purchaseData.purchase_at = momentTz(item.purchase_at).format(
+      "YYYY-MM-DD"
+    )),
+      (purchaseData.is_sold = false);
+    purchaseData.sold = {};
+    purchaseData.hsn_sac = item?.sac || "";
+    purchaseData.purchase = {
+      from: item.purchase_from,
+      alt_phone: item?.alt_phone ? parseInt(item?.alt_phone) : null,
+      phone: parseInt(item.phone),
+      is_cash: item.is_cash,
+      is_online: item.is_online,
+      purchase_amount: parseInt(item.purchase_amount),
+      balance: purchaseAmount - ((cashAmount || 0) + (onlineAmount || 0)),
+      comment: item.comment,
+      payment: item.mod,
+      is_settled: false,
+      purchase_warranty: item.purchase_warranty,
+      other_expenses: item.other_expenses,
+    };
+    return await purchaseData;
+  });
+};
+
+class Product {
+  static async purchaseProduct(ctx: Context) {
+    const body = ctx.request.body;
+    const { product, ...others } = body;
+    let prodBody = [];
+    function padWithLeadingZeros(num: any, totalLength: number) {
+      return String(num).padStart(totalLength, "0");
+    }
+    if (typeof product === "string") prodBody = [JSON.parse(product)];
+    else prodBody = [...product];
+
+    let validationErrs: any;
+    let imeiErrs: any;
+    let formatBody = await formatBd(prodBody, ctx, others, false);
+    const resolvedFormatBody = await Promise.all(formatBody);
+
+    if (resolvedFormatBody.some((item: {}) => item.hasOwnProperty("status"))) {
+      imeiErrs = await Promise.all(formatBody);
+    }
+    if (imeiErrs) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(
+        RFC.H412,
+        `${MSG.IMEI_EXIST} on ${imeiErrs[0].index + 1}-product`
+      );
+      return;
+    }
+    if (validationErrs) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(RFC.H400, validationErrs);
+      return;
+    }
+
+    let receipt_no: any;
+    const [lastDoc] = await getReceiptLastAddedProd(ctx);
+
+    if (lastDoc && lastDoc.receipt_no) {
+      receipt_no =
+        "PV_" +
+        padWithLeadingZeros(Number(lastDoc.receipt_no.split("_")[1]) + 1, 5);
+    } else receipt_no = "PV_" + padWithLeadingZeros(1, 5);
+
+    await createProduct(ctx, resolvedFormatBody, receipt_no);
+    ctx.status = RFC.H201;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product purchased successfully!",
+      { receipt_no: receipt_no }
+    );
+  }
+
+  static async uploadInventory(ctx: Context) {
+    const { file }: any = ctx.request.files;
+    let imeiErrs: any;
+    const workbook = new Excel.Workbook();
+    const worksheet: any = await workbook.xlsx.readFile(file.path);
+    const productDetails: any = [];
+    const customerDetails: any = [];
+    const productKeys: any = {};
+
+    worksheet
+      .getWorksheet(1)
+      .eachRow({ includeEmpty: false }, function (row: any, rowNumber: any) {
+        const rowObject: any = {};
+        if (rowNumber == 1)
+          row.eachCell(
+            { includeEmpty: true },
+            function (cell: any, colNumber: any) {
+              let uplatedCellValue = cell?.value;
+              if (cell?.value == "Purchase Date")
+                uplatedCellValue = "purchase at";
+              if (cell?.value == "Phone No.") uplatedCellValue = "phone";
+              if (cell?.value == "Purchased From")
+                uplatedCellValue = "purchase from";
+              if (cell?.value == "IMEI 1") uplatedCellValue = "imei";
+              if (cell?.value == "IMEI 2") uplatedCellValue = "imei 1";
+              productKeys[`col${colNumber}`] =
+                uplatedCellValue &&
+                uplatedCellValue.toLowerCase().split(" ").join("_");
+            }
+          );
+        else {
+          if (rowNumber > 4)
+            row.eachCell(
+              { includeEmpty: true },
+              function (cell: any, colNumber: any) {
+                const date0 = new Date(0);
+                const utcOffset = date0.getTimezoneOffset();
+
+                const cellValue = new Date(
+                  0,
+                  0,
+                  cell.value - 1,
+                  0,
+                  -utcOffset,
+                  0
+                );
+                const dateMod = moment(new Date(cellValue)).format();
+
+                rowObject[productKeys[`col${colNumber}`]] =
+                  colNumber == 1
+                    ? dateMod === "Invalid date"
+                      ? moment(cell.value).format("L")
+                      : dateMod
+                    : colNumber == 8
+                    ? cell?.value.toString()
+                    : cell.value;
+              }
+            );
+        }
+        if (Object.values(rowObject).length > 0) {
+          productDetails.push(rowObject);
+        }
+      });
+    const { request, ...context } = ctx;
+    let validationErrs: any;
+    const formatBody = formatBd(
+      extractDataFromFile(productDetails),
+      context,
+      customerDetails[0],
+      true
+    );
+
+    const resolvedFormatBody = await Promise.all(formatBody);
+    const checkBody = await Promise.all(formatBody);
+
+    if (resolvedFormatBody.some((item: {}) => item.hasOwnProperty("status"))) {
+      imeiErrs = await Promise.all(formatBody);
+    }
+    if (imeiErrs) {
+      ctx.status = RFC.H201;
+      ctx.body = jsonFormatter.errorResponse(
+        RFC.H412,
+        `${MSG.IMEI_EXIST} on ${imeiErrs[0].index + 1}-product`
+      );
+      return;
+    }
+
+    if (formatBody?.errors) {
+      validationErrs = formatBody;
+    }
+
+    const checkErr = resolvedFormatBody.some((item) =>
+      item.hasOwnProperty("errors")
+    );
+
+    if (checkBody.length == 0) {
+      ctx.status = RFC.H201;
+      ctx.body = jsonFormatter.errorResponse(
+        RFC.H400,
+
+        `Empty Excel sheet`
+      );
+      return;
+    }
+
+    if (validationErrs || checkErr) {
+      ctx.status = RFC.H201;
+      ctx.body = jsonFormatter.errorResponse(
+        RFC.H400,
+        validationErrs ||
+          `${checkBody[0].errors} in row ${checkBody[0].index + 1}`
+      );
+      return;
+    }
+    await createProduct(ctx, checkBody, null);
+    ctx.status = RFC.H201;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product purchased successfully!"
+    );
+  }
+  static async sellProduct(ctx: Context) {
+    const body = ctx.request.body;
+    const { multiple } = ctx.query;
+    const { user } = ctx.state;
+    function padWithLeadingZeros(num: any, totalLength: number) {
+      return String(num).padStart(totalLength, "0");
+    }
+    if (!multiple || multiple != "true") {
+      let productById: any = null;
+      // validation body
+      const validation: ValidationType = await validateData(
+        body,
+        jsonSchemaUtil.sellProduct,
+        {}
+      );
+      if (validation.errors) {
+        ctx.status = RFC.H400;
+        ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+        return;
+      }
+      // get product by id
+      try {
+        productById = await getProductById(ctx, body.product_id);
+      } catch (e) {
+        ctx.status = RFC.H404;
+        ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+        return;
+      }
+      // prepare sell data
+      const sellData: any = formatSold(body);
+      // sell price to float
+      const sellPrice = parseFloat(body.sell_price);
+      // cash amount to float
+      const cashAmount = parseFloat(body.payment.cash.amount);
+      // online amount to float
+      const onlineAmount = parseFloat(body.payment.online.amount);
+      sellData.balance = sellPrice - ((cashAmount || 0) + (onlineAmount || 0));
+      // calculate profit loss
+      sellData.profit_loss =
+        sellPrice - parseFloat(productById.purchase.purchase_amount);
+
+      let invoiceNo: any;
+
+      const [lastDoc] = await getLastAddedProd(ctx);
+      if (lastDoc && lastDoc.invoice_no) {
+        invoiceNo =
+          "inv_" +
+          padWithLeadingZeros(Number(lastDoc.invoice_no.split("_")[1]) + 1, 5);
+      } else invoiceNo = "inv_" + padWithLeadingZeros(1, 5);
+
+      await updateProductPayment(ctx, productById._id, sellData, invoiceNo);
+      ctx.status = RFC.H200;
+      ctx.body = jsonFormatter.successResponse(
+        RFC.H200,
+        "Product sold successfully!",
+        { invoice_no: invoiceNo }
+      );
+      return;
+    } else {
+      let invoiceNo: any;
+      const [lastDoc] = await getLastAddedProd(ctx);
+
+      if (lastDoc && lastDoc.invoice_no) {
+        invoiceNo =
+          "inv_" +
+          padWithLeadingZeros(Number(lastDoc.invoice_no.split("_")[1]) + 1, 5);
+      } else {
+        invoiceNo = "inv_" + padWithLeadingZeros(1, 5);
+      }
+      await Promise.all(
+        body.map(async (body: any) => {
+          let productById: any = null;
+          // validation body
+          const validation: ValidationType = await validateData(
+            body,
+            jsonSchemaUtil.sellProduct,
+            {}
+          );
+          if (validation.errors) {
+            ctx.status = RFC.H400;
+            ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+            return;
+          }
+          // get product by id
+          try {
+            productById = await getProductById(ctx, body.product_id);
+          } catch (e) {
+            ctx.status = RFC.H404;
+            ctx.body = jsonFormatter.errorResponse(
+              RFC.H404,
+              MSG.PRODUCT_NOT_FOUND
+            );
+            return;
+          }
+
+          // prepare sell data
+          const sellData: any = formatSold(body);
+          // sell price to float
+          const sellPrice = parseFloat(body.sell_price);
+          // cash amount to float
+          const cashAmount = parseFloat(body.payment.cash.amount);
+          // online amount to float
+          const onlineAmount = parseFloat(body.payment.online.amount);
+          sellData.balance =
+            sellPrice - ((cashAmount || 0) + (onlineAmount || 0));
+          // calculate profit loss
+          sellData.profit_loss =
+            sellPrice - parseFloat(productById.purchase.purchase_amount);
+          sellData.you_received = body.you_received || 0;
+
+          await updateProductPayment(ctx, productById._id, sellData, invoiceNo);
+        })
+      );
+
+      ctx.status = RFC.H200;
+      ctx.body = jsonFormatter.successResponse(
+        RFC.H200,
+        "Product sold successfully po!",
+        { invoice_no: invoiceNo }
+      );
+      return;
+    }
+  }
+
+  static async getProduct(ctx: Context) {
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(RFC.H200, "Product detail!", []);
+  }
+
+  static async deleteProduct(ctx: Context) {
+    const { id } = ctx.params;
+    let product = null;
+    // find product by id
+    try {
+      product = await getProductById(ctx, id);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+
+    // delete product
+    await deleteProductById(ctx, id);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product deleted successfully!",
+      []
+    );
+  }
+
+  static async getProductById(ctx: Context) {
+    const { id } = ctx.params;
+    let product = null;
+    // find product by id
+    try {
+      product = await getProductById(ctx, id);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product detail!",
+      product
+    );
+  }
+  static async getProductByImei(ctx: Context) {
+    const { imei } = ctx.params;
+    let product = null;
+    // find product by id
+    try {
+      product = await getProductByImeiService(ctx, imei);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product detail!",
+      product
+    );
+  }
+  static async getProductByFilter(ctx: Context) {
+    let product = null;
+    // find product by id
+    try {
+      product = await getFilteredProductService(ctx);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product detail!",
+      product
+    );
+  }
+
+  static async deleteProductSell(ctx: Context) {
+    const { id } = ctx.params;
+    let product: any;
+    // find product by id
+    try {
+      product = await getProductById(ctx, id);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+    // delete product by sell id
+    await deleteProductSellById(ctx, product._id);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product deleted successfully!",
+      []
+    );
+  }
+
+  static async editProductPurchase(ctx: Context) {
+    const body = ctx.request.body;
+    const { id } = ctx.params;
+    const { user } = ctx.state;
+    const idImage: any = ctx.request.files?.id_proof;
+    const billImage: any = ctx.request.files?.bill_proof;
+    if (body?.mod) {
+      body.mod = JSON.parse(body.mod);
+    }
+    const validation: ValidationType = await validateData(
+      body,
+      jsonSchemaUtil.editProductPurchase,
+      {}
+    );
+    if (validation.errors) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+      return;
+    }
+
+    // // if product exist
+    let product: any = null;
+    try {
+      product = await getProductById(ctx, id);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+
+    // // prepare purchase data
+    const purchaseData: any = formatProductPurchase(body);
+    purchaseData.dukandar_id = new ObjectId(user._id);
+    purchaseData.imei = purchaseData.imei.toString();
+    purchaseData.mobile_type = body.mobile_type || "";
+    purchaseData.hsn_sac = body.hsn || "";
+
+    const purchaseAmount = parseFloat(body.purchase_amount);
+    const cashAmount = parseFloat(body.mod.cash.amount);
+    const onlineAmount = parseFloat(body.mod.online.amount);
+    let id_proof;
+    let bill_proof;
+    if (idImage) id_proof = await savingFileForPurchase(idImage);
+    if (billImage) bill_proof = await savingFileForPurchase(billImage);
+    if (id_proof)
+      purchaseData.id_proof = `${process.env.APP_IMAGE_BASE_URL}/${id_proof}`;
+    if (bill_proof)
+      purchaseData.bill_proof = `${process.env.APP_IMAGE_BASE_URL}/${bill_proof}`;
+    (purchaseData.purchase_at = momentTz(body.purchase_at).format(
+      "YYYY-MM-DD"
+    )),
+      (purchaseData.purchase = {
+        from: body.purchase_from,
+        phone: parseInt(body.phone),
+        alt_phone: body.alt_phone ? parseInt(body.alt_phone) : null,
+        is_cash: body.is_cash,
+        is_online: body.is_online,
+        purchase_amount: purchaseAmount,
+        balance: purchaseAmount - ((cashAmount || 0) + (onlineAmount || 0)),
+        comment: body.comment,
+        payment: body.mod,
+        purchase_warranty: body.purchase_warranty,
+        other_expenses: body.other_expenses,
+      });
+
+    await editPurchaseProductById(ctx, product._id, purchaseData);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product edited successfully!",
+      purchaseData
+    );
+  }
+
+  static async getProductList(ctx: Context) {
+    const { from, to, isBill } = ctx.request.body;
+    const body = ctx.request.body;
+
+    if (!isBill) {
+      if (from != "" && to != "") {
+        const validation: ValidationType = await validateData(
+          { from, to },
+          jsonSchemaUtil.dateFilterValidator,
+          {}
+        );
+        if (validation.errors) {
+          ctx.status = RFC.H412;
+          ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+          return;
+        }
+        // check date is less than equal to today
+        if (!momentTz(from).isSameOrBefore(momentTz(to))) {
+          ctx.status = RFC.H400;
+          ctx.body = jsonFormatter.errorResponse(
+            RFC.H400,
+            "Invalid date filter range!"
+          );
+          return;
+        }
+        // check sold type
+        if (
+          body.hasOwnProperty("is_sold") &&
+          body.is_sold == true &&
+          (body.sold_type == null ||
+            body.sold_type == "" ||
+            ["all", "full", "half"].indexOf(body.sold_type) == -1)
+        ) {
+          ctx.status = RFC.H400;
+          ctx.body = jsonFormatter.errorResponse(
+            RFC.H400,
+            "sold_type is required!"
+          );
+          return;
+        }
+      }
+    }
+    // await checkk(ctx)
+    const products = await getProductListByUser(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product list!",
+      products
+    );
+  }
+
+  static async getDashboardStatus(ctx: Context) {
+    const status = await getDashboardStatusService(ctx);
+    // 200 OK
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Dashboard status!",
+      status
+    );
+  }
+  static async getReportStatus(ctx: Context) {
+    const status = await getProductsReportService(ctx);
+    // 200 OK
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Report status!",
+      status
+    );
+  }
+
+  static async getBasedOnProduct(ctx: Context) {
+    // call search by purchased proruct service
+    const searchItems = await byProductCountService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      searchItems
+    );
+  }
+  static async getNameBasedOnProduct(ctx: Context) {
+    // call search by purchased proruct service
+    const searchItems = await modelByProductCountService(ctx);
+    if (searchItems && searchItems.length > 0) {
+      ctx.status = RFC.H200;
+      ctx.body = jsonFormatter.successResponse(
+        RFC.H200,
+        "Search result",
+        searchItems
+      );
+    } else {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.USER_NOT_FOUND);
+    }
+  }
+  static async getProductsStatus(ctx: Context) {
+    const status = await getProductsStatusService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Product status!",
+      status
+    );
+  }
+
+  static async getKhataReport(ctx: Context) {
+    // validation for khata report
+    const validation: ValidationType = await validateData(
+      ctx.request.body,
+      jsonSchemaUtil.khataReport,
+      {}
+    );
+    if (validation.errors) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+      return;
+    }
+    // generate report
+    const report = await getKhataReportService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(RFC.H200, "Khata report!", report);
+  }
+
+  static async getKhataStatus(ctx: Context) {
+    const status = await getKhataStatusService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(RFC.H200, "Khata status!", status);
+  }
+
+  static async searchProduct(ctx: Context) {
+    const body = ctx.request.body;
+    // validation
+    const validation: ValidationType = await validateData(
+      body,
+      jsonSchemaUtil.searchProduct,
+      {}
+    );
+    if (validation.errors) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(RFC.H400, validation.errors);
+      return;
+    }
+    // search
+    const searchItems = await searchProductService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      searchItems
+    );
+  }
+  static async searchInvoice(ctx: Context) {
+    const body = ctx.request.body;
+    let product;
+    try {
+      product = await getProductByInvoiceId(ctx, body.invoice_id);
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, MSG.PRODUCT_NOT_FOUND);
+      return;
+    }
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      product
+    );
+  }
+  static async searchUserByProductPurchased(ctx: Context) {
+    // call search by purchased proruct service
+    const searchItems = await searchUserByProductPurchasedService(ctx);
+    let newData;
+    if (searchItems && searchItems.length > 0) {
+      newData = searchItems.filter(
+        (v, i, a) =>
+          a.findIndex((v2) => JSON.stringify(v2) === JSON.stringify(v)) === i
+      );
+    }
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      newData
+    );
+  }
+  static async searchUserByProductSold(ctx: Context) {
+    // call search by sold proruct service
+    const searchItems = await searchUserByProductSoldService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      searchItems
+    );
+  }
+
+  static async advancedSearch(ctx: Context) {
+    // search
+    const searchItems = await advancedSearchService(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Search result",
+      searchItems
+    );
+  }
+
+  static async invidualClientKhata(ctx: Context) {
+    // find with or condition mongodb with fields product.purcahse.from, product.purcahse.phone
+    const khata = await getInvidualKhata(ctx);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(RFC.H200, "Khata report!", khata);
+  }
+
+  static async invidualClientKhataAll(ctx: Context) {
+    // find with or condition mongodb with fields product.purcahse.from, product.purcahse.phone
+    const khata = await getInvidualKhataAll(ctx, false);
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(RFC.H200, "Khata report!", khata);
+  }
+
+  static async settleKhata(ctx: Context) {
+    // get body
+    const body = ctx.request.body;
+    // validation for product id
+    const validation: ValidationType = await validateData(
+      body,
+      jsonSchemaUtil.settleKhata,
+      {}
+    );
+    if (validation.errors) {
+      ctx.status = RFC.H412;
+      ctx.body = jsonFormatter.errorResponse(RFC.H412, validation.errors);
+      return;
+    }
+    // check if product exists
+    // try catch
+    try {
+      const product: any = await getProductById(ctx, body.product_id);
+
+      // check if product is not settled
+      if (body.type === "creditors" && product.purchase.is_settled === true) {
+        ctx.status = RFC.H400;
+        ctx.body = jsonFormatter.errorResponse(
+          RFC.H400,
+          "Khata already settled!"
+        );
+        return;
+      }
+
+      if (body.type === "debtors" && product.sold.is_settled === true) {
+        ctx.status = RFC.H400;
+        ctx.body = jsonFormatter.errorResponse(
+          RFC.H400,
+          "Khata already settled!"
+        );
+        return;
+      }
+      // update product settle status
+      await updateProductSettleStatus(ctx, body);
+      // end
+      ctx.status = RFC.H200;
+      ctx.body = jsonFormatter.successResponse(RFC.H200, "Khata settled!", {
+        product: body.product_id,
+      });
+    } catch (error) {
+      ctx.status = RFC.H404;
+      ctx.body = jsonFormatter.errorResponse(RFC.H404, "Product not found");
+      return;
+    }
+  }
+  static async getHSN(ctx: Context) {
+    // console.log("in");
+
+    let sac_array = gstIndiaUtils.returnAllSac();
+    let hsn_array = gstIndiaUtils.returnAllHSN();
+    let hsn_sac = {
+      sac: sac_array,
+      hsn: hsn_array,
+    };
+    ctx.status = RFC.H200;
+    ctx.body = jsonFormatter.successResponse(
+      RFC.H200,
+      "Khata report!",
+      hsn_sac
+    );
+  }
+}
+
+export default Product;
+
+
+
+};
+
+
+
+_______________AppFormFile_FE__________________
+
+
+/* eslint-disable react/no-unknown-property */
+/* eslint-disable react/jsx-key */
+import React, { useEffect, useState } from "react";
+import PDFPreview from "./PDFPreview";
+import imageCompression from "browser-image-compression";
+import { toast } from "react-toastify";
+
+const AppFormFile = ({
+  name,
+  accept,
+  placeholder,
+  divClass,
+  inputClass,
+  register,
+  onFileChange,
+  isProof,
+  id,
+  imgPreview,
+  setImgPreview,
+  setIdPrev,
+  idPreview,
+  index,
+  addFormData
+}) => {
+  const [isImagePreview, setImagePreview] = useState([]);
+  const [isPdf, setIsPdf] = useState("");
+  const [myFilesData, setFilesData] = useState([])
+
+  // console.log("onfileChnage",myFilesData);
+  
+  async function handleImageUpload(event) {
+    // console.log("event",event);
+    const imageFile = event.target.files;
+    const options = {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true
+    };
+    try {
+      let myFiles = Object.keys(imageFile).map(async (item) => {
+        let name = imageFile[item].name;
+        const compressedFile = await imageCompression(imageFile[item], options);
+        const myFile = new File([compressedFile], JSON.stringify(name), {
+          type: compressedFile.type
+        });
+        return myFile;
+      });
+      setFilesData(prevState=>[...prevState,...myFiles])
+      await onFileChange(await Promise.all(myFilesData)); 
+
+    //  getFnCall(myFilesData)
+    } catch (error) {
+      toast.warning("Something went wrong", { timeOut: 1000 });
+    }
+  }
+  //function onFileChange to resolve the promise and have the img preview loaded
+const getFnCall=async(myFilesData)=>{
+  await onFileChange(await Promise.all(myFilesData)); 
+}
+
+// handling the state change for myFilesData and then calling genFnCall function 
+useEffect(()=>[
+  getFnCall(myFilesData),
+  
+],[myFilesData])
+
+
+  let handleCloseFile = (i) => {
+    if (!id.includes("id")) {
+      const newArrFile = [...imgPreview];
+      let check = [...isImagePreview];
+      check.splice(i, 1);
+      setImagePreview(check);
+
+      // let check2 = [...myFilesData];
+      // check2.splice(i, 1);
+      // setFilesData(check2);
+      
+
+      if (isImagePreview.length === 0) {
+        newArrFile[index] = { status: false, index: null };
+        setImgPreview(newArrFile);
+      }
+
+    } else {
+      const modified = [...idPreview];
+      modified[i] = { status: false, index: null };
+      setIdPrev(modified);
+    }
+  };
+  useEffect(() => {
+    if (imgPreview && imgPreview[index]?.status && imgPreview[index]?.index === index) {
+      if (addFormData[index] && addFormData[index].bill_proof)
+        setImagePreview(addFormData[index].bill_proof.map((item) => URL.createObjectURL(item)));
+    }
+  }, [addFormData]);
+
+
+
+  return (
+    <div
+      className={`form-group ${divClass} ${isProof && "text-primary"}`}
+      style={{ display: `${isProof ? "contents" : "inline-block"}` }}>
+      <label
+        htmlFor={`${id ? id : "filePicker"}`}
+        className={`text-center app-input-file ${inputClass} pointer`}>
+        {!placeholder ? <i class="fa-solid fa-upload fa-lg"></i> : placeholder}
+      </label>
+      <input
+        type="file"
+        hidden
+        {...register(name)}
+        
+        onChange={(e) => {
+          const { files = [] } = e.target;
+          if (files.length > 4) {
+            toast.warning("You are allowed to upload maximum 2 files", {
+              timeOut: 1000
+            });
+            return;
+          }
+          if (files) {
+            let tempArr = Object.keys(files).map((item) => URL.createObjectURL(files[item]));
+            if (files[0].type === "application/pdf") {
+              console.log("tempArr", tempArr);
+              onFileChange([...files]);
+              setIsPdf(Object.values(files).map((item) => item.name));
+            } else {
+              // console.log("tempArr",tempArr);
+              setImagePreview(prevState=>[...prevState,...tempArr]);
+              setIsPdf("");
+              handleImageUpload(e);
+            }
+          }
+        }}
+        multiple
+        className="form-control d-none"
+        id={`${id ? id : "filePicker"}`}
+        placeholder={placeholder}
+        accept={accept}
+        style={{ display: `${isProof ? "none" : "block"}` }}
+      />
+      {isProof &&
+        !isPdf &&
+        !id.includes("id") &&
+        imgPreview &&
+        imgPreview.length > 0 &&
+        imgPreview[index]?.status &&
+        imgPreview[index]?.index === index &&
+        isImagePreview.length > 0 && (
+          <div className="d-flex">
+            {isImagePreview.map((item, i) => (
+
+              <div
+                key={i}
+                className={`${
+                  isImagePreview.length > 0 ? "d-flex" : "d-none"
+                } position-relative justify-content-center`}>
+                <i
+                  onClick={() => handleCloseFile(i)}
+                  className="fa-solid my-3 cursor-pointer fa-xs fa-circle-xmark img-preview-close"></i>
+                <img src={item} className="img-fluid mt-2 w-50" />
+              </div>
+            ))}
+          </div>
+        )}
+      {isProof &&
+        !isPdf &&
+        id.includes("id") &&
+        idPreview &&
+        idPreview.length > 0 &&
+        isImagePreview.length > 0 && (
+          <div className="d-flex">
+            {isImagePreview.map(
+              (item, i) =>
+                // idPreview[i] &&
+                // idPreview[i].index === i && 
+                (
+                  <div
+                    key={i}
+                    className={`${
+                      isImagePreview.length > 0 ? "d-flex" : "d-none"
+                    } position-relative justify-content-center`}>
+                    <i
+                      onClick={() => handleCloseFile(i)}
+                      className="fa-solid my-3 cursor-pointer fa-xs fa-circle-xmark img-preview-close"></i>
+                    <img src={item} className="img-fluid mt-2 w-50" />
+                  </div>
+                )
+            )}
+          </div>
+        )}
+      {isProof && isPdf.length > 0 && isPdf.map((pdf) => <PDFPreview isPdf={pdf} />)}
+      {!isProof && (
+        <div className={isImagePreview ? "" : "d-none"}>
+          <img src={isImagePreview} className="img-fluid mt-2 w-50" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AppFormFile;
